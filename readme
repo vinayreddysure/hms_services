@@ -1,0 +1,2 @@
+first start docker conatiner which runs db using
+docker compose up --build
