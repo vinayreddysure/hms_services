@@ -51,4 +51,23 @@ if __name__ == "__main__":
 @app.on_event("startup")
 def on_startup():
     SQLModel.metadata.create_all(engine)
-    print("Database tables managed by SQLModel.create_all()")    
+    print("Database tables managed by SQLModel.create_all()")
+    
+    # --- MANUAL MIGRATION PATCH ---
+    # Since Alembic isn't running reliably, we force the column addition here.
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS address VARCHAR"))
+            conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS city VARCHAR"))
+            conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS state VARCHAR"))
+            conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS zip_code VARCHAR"))
+            
+            # Also cleanup bookings while we are at it (Reset requested by user)
+            # conn.execute(text("UPDATE bookings SET status = 'Completed', actual_check_out_at = NOW() WHERE status = 'Active'"))
+            # conn.execute(text("UPDATE rooms SET status = 'A' WHERE status = 'O'"))
+            
+            conn.commit()
+            print("MANUAL MIGRATION SUCCESS: Address columns added.")
+        except Exception as e:
+            print(f"Manual migration warning (might already exist): {e}")    
