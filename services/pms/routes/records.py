@@ -40,6 +40,17 @@ def lookup_customer(
         .order_by(Bookings.check_in_at.desc())
     ).first()
     
+    # 3. Fetch Notes (Feedback)
+    notes_query = (
+        select(CustomerFeedbacks.notes)
+        .where(CustomerFeedbacks.customer_id == customer.customer_id)
+        .where(CustomerFeedbacks.notes != None)
+        .where(CustomerFeedbacks.notes != "")
+        .order_by(CustomerFeedbacks.created_at.desc())
+        .limit(5)
+    )
+    recent_notes = session.exec(notes_query).all()
+    
     return {
         "customer_id": customer.customer_id,
         "first_name": customer.first_name,
@@ -55,7 +66,8 @@ def lookup_customer(
             "previousStays": stay_count,
             "lastVisit": last_stay.check_in_at if last_stay else None,
             "globalRating": float(customer.average_rating) if customer.average_rating else 5.0,
-            "guestStatus": "returning" if stay_count > 0 else "new"
+            "guestStatus": "returning" if stay_count > 0 else "new",
+            "notes": recent_notes
         }
     }
 
