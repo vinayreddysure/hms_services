@@ -186,3 +186,95 @@ def get_customer_history(
         "bookings_history": bookings,
         "global_feedbacks": feedbacks
     }
+
+class CheckoutRequest(SQLModel):
+    notes: Optional[str] = None
+    rating: Optional[int] = None
+
+@router.get("/room/{room_id}/current")
+def get_current_booking_for_room(
+    room_id: int,
+    session: Session = Depends(get_session),
+    current_user: HotelUsers = Depends(get_current_user),
+):
+    """
+    Get the currently active booking for a specific room.
+    Used by the Check-Out modal to show guest details.
+    """
+    # Find active booking for this room
+    statement = (
+        select(Bookings)
+        .where(Bookings.room_id == room_id)
+        .where(Bookings.status == "Active")
+        .order_by(Bookings.check_in_at.desc())
+    )
+    booking = session.exec(statement).first()
+    
+    if not booking:
+        raise HTTPException(status_code=404, detail="No active booking found for this room")
+        
+    # Get Customer Details
+    customer = session.get(Customers, booking.customer_id)
+    
+    return {
+        "booking_id": booking.booking_id,
+        "customer_name": f"{customer.first_name} {customer.last_name}" if customer else "Unknown Guest",
+        "customer_phone": customer.phone if customer else "",
+        "check_in_at": booking.check_in_at,
+        "expected_check_out_at": booking.expected_check_out_at,
+        "total_amount": booking.total_amount,
+        "status": booking.status
+    }
+
+@router.post("/room/{room_id}/checkout")
+def checkout_room(
+    room_id: int,
+    request: CheckoutRequest,
+    session: Session = Depends(get_session),
+    current_user: HotelUsers = Depends(get_current_user),
+):
+    """
+    Complete the check-out process for a room.
+    1. Mark booking as Completed.
+    2. Set Room status to Available (or Dirty).
+    3. (Optional) Create feedback.
+    """
+    # 1. Get Active Booking
+    statement = (
+        select(Bookings)
+        .where(Bookings.room_id == room_id)
+        .where(Bookings.status == "Active")
+        .order_by(Bookings.check_in_at.desc())
+    )
+    booking = session.exec(statement).first()
+    
+    if not booking:
+        raise HTTPException(status_code=404, detail="No active booking to check out")
+        
+    # 2. Update Booking
+    booking.status = "Completed"
+    booking.actual_check_out_at = datetime.utcnow()
+    session.add(booking)
+    
+    # 3. Update Room Status (Set to Available for now, or Dirty if you have that workflow)
+    room = session.get(Rooms, room_id)
+    if room:
+        room.status = "A" # Available
+        session.add(room)
+        
+    # 4. Create Feedback (if rating provided)
+    if request.rating and booking.customer_id:
+        feedback = CustomerFeedbacks(
+            hotel_id=current_user.hotel_id,
+            customer_id=booking.customer_id,
+            booking_id=booking.booking_id,
+            rating=request.rating,
+            comment=request.notes or "",
+            created_at=datetime.utcnow()
+        )
+        session.add(feedback)
+        
+    session.commit()
+    
+    return {"success": True, "message": "Check-out completed successfully"}
+
