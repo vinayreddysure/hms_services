@@ -202,10 +202,20 @@ def get_current_booking_for_room(
     Get the currently active booking for a specific room.
     Used by the Check-Out modal to show guest details.
     """
+    # Auto-resolve Room ID vs Room Number
+    real_room = session.get(Rooms, room_id)
+    if not real_room:
+        real_room = session.exec(select(Rooms).where(Rooms.room_number == str(room_id))).first()
+    
+    if not real_room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    target_room_id = real_room.room_id
+
     # Find active booking for this room
     statement = (
         select(Bookings)
-        .where(Bookings.room_id == room_id)
+        .where(Bookings.room_id == target_room_id)
         .where(Bookings.status == "Active")
         .order_by(Bookings.check_in_at.desc())
     )
@@ -240,10 +250,20 @@ def checkout_room(
     2. Set Room status to Available (or Dirty).
     3. (Optional) Create feedback.
     """
+    # Auto-resolve Room ID vs Room Number
+    real_room = session.get(Rooms, room_id)
+    if not real_room:
+        real_room = session.exec(select(Rooms).where(Rooms.room_number == str(room_id))).first()
+    
+    if not real_room:
+         raise HTTPException(status_code=404, detail="Room not found")
+         
+    target_room_id = real_room.room_id
+
     # 1. Get Active Booking
     statement = (
         select(Bookings)
-        .where(Bookings.room_id == room_id)
+        .where(Bookings.room_id == target_room_id)
         .where(Bookings.status == "Active")
         .order_by(Bookings.check_in_at.desc())
     )
@@ -257,11 +277,9 @@ def checkout_room(
     booking.actual_check_out_at = datetime.utcnow()
     session.add(booking)
     
-    # 3. Update Room Status (Set to Available for now, or Dirty if you have that workflow)
-    room = session.get(Rooms, room_id)
-    if room:
-        room.status = "A" # Available
-        session.add(room)
+    # 3. Update Room Status
+    real_room.status = "A" # Available
+    session.add(real_room)
         
     # 4. Create Feedback (if rating provided)
     if request.rating and booking.customer_id:
