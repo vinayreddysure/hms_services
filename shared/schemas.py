@@ -32,6 +32,11 @@ class BookingCreate(BookingBase):
     guest_name: Optional[str] = None
     guest_phone: Optional[str] = None
     guest_gov_id: Optional[str] = None
+    # Address Upsert Fields
+    guest_address: Optional[str] = None
+    guest_city: Optional[str] = None
+    guest_state: Optional[str] = None
+    guest_zip_code: Optional[str] = None
 
 class RoomCreate(SQLModel):
     room_number: str

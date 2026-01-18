@@ -46,6 +46,11 @@ def lookup_customer(
         "last_name": customer.last_name,
         "phone": customer.phone,
         "gov_id": customer.gov_id,
+        # Address Return
+        "address": customer.address,
+        "city": customer.city,
+        "state": customer.state,
+        "zip_code": customer.zip_code,
         "insights": {
             "previousStays": stay_count,
             "lastVisit": last_stay.check_in_at if last_stay else None,
@@ -84,7 +89,13 @@ def create_booking(
         
         if existing_customer:
             booking.customer_id = existing_customer.customer_id
-            # Optional: Update phone if new one provided? Let's skip updating for now to be safe.
+            # OPTIONAL: Update address if provided
+            if booking.guest_address: existing_customer.address = booking.guest_address
+            if booking.guest_city: existing_customer.city = booking.guest_city
+            if booking.guest_state: existing_customer.state = booking.guest_state
+            if booking.guest_zip_code: existing_customer.zip_code = booking.guest_zip_code
+            session.add(existing_customer)
+            
         else:
             # Create New Customer
             # Split name safely
@@ -97,6 +108,11 @@ def create_booking(
                 first_name=f_name,
                 last_name=l_name,
                 phone=booking.guest_phone,
+                # Save Address
+                address=booking.guest_address,
+                city=booking.guest_city,
+                state=booking.guest_state,
+                zip_code=booking.guest_zip_code,
                 average_rating=5.0
             )
             session.add(new_customer)

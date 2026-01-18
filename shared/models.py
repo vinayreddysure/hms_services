@@ -48,6 +48,12 @@ class Customers(SQLModel, table=True):
     last_name: str
     phone: Optional[str] = Field(default=None)
     
+    # Address Fields
+    address: Optional[str] = Field(default=None)
+    city: Optional[str] = Field(default=None)
+    state: Optional[str] = Field(default=None)
+    zip_code: Optional[str] = Field(default=None)
+    
     average_rating: Optional[Decimal] = Field(
         default=None, 
         sa_column=Column(DECIMAL(precision=3, scale=2), nullable=True)
