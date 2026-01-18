@@ -4,13 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
 
 from shared.database import engine
-from shared.routes import users
-from shared.routes import records
-from shared.routes import hotel
-from shared.routes import check_in_out
-from shared.routes import rooms
 
-from shared.routes import auth
+# Corrected Imports from Services
+from services.identity.routes import users, auth
+from services.pms.routes import records, hotel, check_in_out, rooms
 
 app = FastAPI(title="My Backend API")
 
