@@ -65,90 +65,99 @@ def create_booking(
     current_user: HotelUsers = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    # --- 1. Smart ID Resolution for Rooms ---
-    real_room = session.get(Rooms, booking.room_id)
-    if not real_room:
-        statement = select(Rooms).where(Rooms.room_number == str(booking.room_id))
-        real_room = session.exec(statement).first()
-        if real_room:
-             booking.room_id = real_room.room_id
-        else:
-             raise HTTPException(status_code=404, detail=f"Room identifier {booking.room_id} not found.")
+    try:
+        # --- 1. Smart ID Resolution for Rooms ---
+        real_room = session.get(Rooms, booking.room_id)
+        if not real_room:
+            statement = select(Rooms).where(Rooms.room_number == str(booking.room_id))
+            real_room = session.exec(statement).first()
+            if real_room:
+                 booking.room_id = real_room.room_id
+            else:
+                 raise HTTPException(status_code=404, detail=f"Room identifier {booking.room_id} not found.")
 
-    # --- 2. Smart Customer Upsert ---
-    # If no customer_id provided, look up or create based on Guest Details
-    if not booking.customer_id:
-        if not booking.guest_gov_id or not booking.guest_name:
-             raise HTTPException(status_code=400, detail="Either customer_id or guest details (Name, ID) are required.")
-        
-        # Standardize
-        gov_id_clean = booking.guest_gov_id.strip().upper()
-        
-        # Check Existing
-        existing_customer = session.exec(select(Customers).where(Customers.gov_id == gov_id_clean)).first()
-        
-        if existing_customer:
-            booking.customer_id = existing_customer.customer_id
-            # OPTIONAL: Update address if provided
-            if booking.guest_address: existing_customer.address = booking.guest_address
-            if booking.guest_city: existing_customer.city = booking.guest_city
-            if booking.guest_state: existing_customer.state = booking.guest_state
-            if booking.guest_zip_code: existing_customer.zip_code = booking.guest_zip_code
-            session.add(existing_customer)
+        # --- 2. Smart Customer Upsert ---
+        # If no customer_id provided, look up or create based on Guest Details
+        if not booking.customer_id:
+            if not booking.guest_gov_id or not booking.guest_name:
+                 raise HTTPException(status_code=400, detail="Either customer_id or guest details (Name, ID) are required.")
             
-        else:
-            # Create New Customer
-            # Split name safely
-            parts = booking.guest_name.strip().split(" ", 1)
-            f_name = parts[0]
-            l_name = parts[1] if len(parts) > 1 else ""
+            # Standardize
+            gov_id_clean = booking.guest_gov_id.strip().upper()
             
-            new_customer = Customers(
-                gov_id=gov_id_clean,
-                first_name=f_name,
-                last_name=l_name,
-                phone=booking.guest_phone,
-                # Save Address
-                address=booking.guest_address,
-                city=booking.guest_city,
-                state=booking.guest_state,
-                zip_code=booking.guest_zip_code,
-                average_rating=5.0
-            )
-            session.add(new_customer)
-            session.commit()
-            session.refresh(new_customer)
-            booking.customer_id = new_customer.customer_id
+            # Check Existing
+            existing_customer = session.exec(select(Customers).where(Customers.gov_id == gov_id_clean)).first()
+            
+            if existing_customer:
+                booking.customer_id = existing_customer.customer_id
+                # OPTIONAL: Update address if provided
+                if booking.guest_address: existing_customer.address = booking.guest_address
+                if booking.guest_city: existing_customer.city = booking.guest_city
+                if booking.guest_state: existing_customer.state = booking.guest_state
+                if booking.guest_zip_code: existing_customer.zip_code = booking.guest_zip_code
+                session.add(existing_customer)
+                
+            else:
+                # Create New Customer
+                # Split name safely
+                parts = booking.guest_name.strip().split(" ", 1)
+                f_name = parts[0]
+                l_name = parts[1] if len(parts) > 1 else ""
+                
+                new_customer = Customers(
+                    gov_id=gov_id_clean,
+                    first_name=f_name,
+                    last_name=l_name,
+                    phone=booking.guest_phone,
+                    # Save Address
+                    address=booking.guest_address,
+                    city=booking.guest_city,
+                    state=booking.guest_state,
+                    zip_code=booking.guest_zip_code,
+                    average_rating=5.0
+                )
+                session.add(new_customer)
+                session.commit()
+                session.refresh(new_customer)
+                booking.customer_id = new_customer.customer_id
 
-    # --- 3. Overlap Check ---
-    if booking.check_in_at and booking.expected_check_out_at:
-        start_time = booking.check_in_at
-        if not is_room_available(session, booking.room_id, start_time, booking.expected_check_out_at):
-            raise HTTPException(status_code=409, detail="Room is already booked for these dates")
+        # --- 3. Overlap Check ---
+        if booking.check_in_at and booking.expected_check_out_at:
+            start_time = booking.check_in_at
+            if not is_room_available(session, booking.room_id, start_time, booking.expected_check_out_at):
+                raise HTTPException(status_code=409, detail="Room is already booked for these dates")
 
-    # --- 4. Create Booking ---
-    new_booking = Bookings(
-        hotel_id=current_user.hotel_id,
-        customer_id=booking.customer_id,
-        room_id=booking.room_id,
-        created_by_user_id=current_user.user_id,
-        check_in_at=booking.check_in_at,
-        expected_check_out_at=booking.expected_check_out_at,
-        actual_check_out_at=None,
-        total_amount=booking.total_amount,
-        status=booking.status or "Active"
-    )
-    session.add(new_booking)
-    
-    # --- 5. Update Room Status to Occupied ---
-    room = session.get(Rooms, booking.room_id)
-    if room:
-       room.status = "O"
-       session.add(room)
+        # --- 4. Create Booking ---
+        new_booking = Bookings(
+            hotel_id=current_user.hotel_id,
+            customer_id=booking.customer_id,
+            room_id=booking.room_id,
+            created_by_user_id=current_user.user_id,
+            check_in_at=booking.check_in_at,
+            expected_check_out_at=booking.expected_check_out_at,
+            actual_check_out_at=None,
+            total_amount=booking.total_amount,
+            status=booking.status or "Active"
+        )
+        session.add(new_booking)
+        
+        # --- 5. Update Room Status to Occupied ---
+        room = session.get(Rooms, booking.room_id)
+        if room:
+           room.status = "O"
+           session.add(room)
 
-    session.commit()
-    session.refresh(new_booking)
-    return new_booking
+        session.commit()
+        session.refresh(new_booking)
+        return new_booking
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"CRITICAL ERROR IN CREATE_BOOKING: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.get("/customer/{customer_id}")
 def get_customer_history(
