@@ -123,6 +123,13 @@ def create_booking(
         status=booking.status or "Active"
     )
     session.add(new_booking)
+    
+    # --- 5. Update Room Status to Occupied ---
+    room = session.get(Rooms, booking.room_id)
+    if room:
+       room.status = "O"
+       session.add(room)
+
     session.commit()
     session.refresh(new_booking)
     return new_booking
