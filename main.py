@@ -39,9 +39,16 @@ app.include_router(rooms.router, prefix="/rooms", tags=["Rooms"])
 def root():
     return {"message": "Backend is running!"}
 
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+
 
 # --- Startup: create tables ---
-# @app.on_event("startup")
-# def on_startup():
-#     # SQLModel.metadata.create_all(engine)
-#     print("Database tables managed by Alembic")    
+# --- Startup: create tables ---
+@app.on_event("startup")
+def on_startup():
+    SQLModel.metadata.create_all(engine)
+    print("Database tables managed by SQLModel.create_all()")    
