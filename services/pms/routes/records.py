@@ -288,7 +288,7 @@ def checkout_room(
             customer_id=booking.customer_id,
             booking_id=booking.booking_id,
             rating=request.rating,
-            comment=request.notes or "",
+            notes=request.notes or "",
             created_at=datetime.utcnow()
         )
         session.add(feedback)
