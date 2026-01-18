@@ -1,7 +1,7 @@
 from typing import List, Tuple, Any, Dict, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, SQLModel
 from shared.dependencies import get_session, get_current_user
 from shared.models import Bookings, CustomerFeedbacks, HotelUsers, Rooms, Customers, CustomerNotes
 from shared.schemas import BookingCreate, BookingRead
