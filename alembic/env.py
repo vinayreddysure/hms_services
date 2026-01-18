@@ -25,6 +25,9 @@ if config.config_file_name is not None:
 # This keeps credentials out of alembic.ini
 database_url = os.getenv("DATABASE_URL")
 if database_url:
+    # Fix for Railway/Heroku
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
     config.set_main_option("sqlalchemy.url", database_url)
 
 # add your model's MetaData object here

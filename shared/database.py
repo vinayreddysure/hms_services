@@ -7,6 +7,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
 
+# Fix for Railway/Heroku: SQLAlchemy requires 'postgresql://', but some providers give 'postgres://'
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # Only enable SQL echo if DEBUG is explicitly true
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() == "true"
 
