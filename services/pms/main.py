@@ -5,9 +5,15 @@ from .routes import records, hotel, check_in_out, rooms
 app = FastAPI(title="PMS Service")
 
 # --- CORS ---
+origins = [
+    "http://localhost:3000",
+    "http://localhost",
+    "https://hmsapp-production.up.railway.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all for production demo
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
