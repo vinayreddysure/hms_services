@@ -19,6 +19,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Logging Middleware ---
+from shared.middleware import LogExceptionMiddleware
+app.add_middleware(LogExceptionMiddleware)
+
 # --- Routers ---
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/users", tags=["hotelusers"])

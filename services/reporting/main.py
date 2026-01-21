@@ -11,6 +11,10 @@ from shared.models import Bookings
 
 app = FastAPI(title="Reporting Service")
 
+# --- Logging Middleware ---
+from shared.middleware import LogExceptionMiddleware
+app.add_middleware(LogExceptionMiddleware)
+
 def get_session():
     with Session(engine) as session:
         yield session

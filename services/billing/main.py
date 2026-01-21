@@ -9,6 +9,10 @@ from shared.models import Hotels
 
 app = FastAPI(title="Billing Service")
 
+# --- Logging Middleware ---
+from shared.middleware import LogExceptionMiddleware
+app.add_middleware(LogExceptionMiddleware)
+
 # Env Variables
 STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
