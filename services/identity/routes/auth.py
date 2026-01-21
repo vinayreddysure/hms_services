@@ -2,6 +2,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
+from sqlalchemy.exc import IntegrityError
 from shared.dependencies import get_session
 from shared.models import HotelUsers, Hotels, Rooms
 from shared.schemas import RegisterRequest
@@ -45,6 +46,14 @@ def register_hotel(
     if existing_user:
         raise HTTPException(status_code=400, detail="User with this email already exists")
 
+    # 1.1 Pre-validate Room Numbers in Payload
+    all_room_numbers = set()
+    for floor in payload.floors:
+        for room in floor.rooms:
+            if room.number in all_room_numbers:
+                raise HTTPException(status_code=400, detail=f"Duplicate room number found in layout: {room.number}")
+            all_room_numbers.add(room.number)
+
     # 2. Create Hotel
     layout_data = [floor.model_dump() for floor in payload.floors]
     receipt_data = payload.receiptSettings.model_dump() if payload.receiptSettings else None
@@ -75,17 +84,25 @@ def register_hotel(
     session.add(new_user)
     
     # 4. Create Rooms (Iterate Floors -> Rooms)
-    for floor in payload.floors:
-        for room_data in floor.rooms:
-            new_room = Rooms(
-                hotel_id=new_hotel.hotel_id,
-                room_number=room_data.number,
-                room_type=room_data.type,
-                rate=room_data.rate,
-                status="A" # Available Default
-            )
-            session.add(new_room)
-            
-    session.commit()
+    # 4. Create Rooms (Iterate Floors -> Rooms)
+    try:
+        for floor in payload.floors:
+            for room_data in floor.rooms:
+                new_room = Rooms(
+                    hotel_id=new_hotel.hotel_id,
+                    room_number=room_data.number,
+                    room_type=room_data.type,
+                    rate=room_data.rate,
+                    status="A" # Available Default
+                )
+                session.add(new_room)
+                
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Database integrity error: Possible duplicate room numbers or invalid data.")
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
     
     return {"status": "success", "hotel_id": new_hotel.hotel_id}

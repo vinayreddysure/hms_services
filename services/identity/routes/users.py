@@ -25,6 +25,12 @@ def get_user(
         
     return user
 
+@router.get("/me", response_model=HotelUserRead)
+def get_current_user_profile(
+    current_user: HotelUsers = Depends(get_current_user),
+):
+    return current_user
+
 @router.post("/", response_model=HotelUserRead)
 def create_user(
     user: HotelUserCreate, 

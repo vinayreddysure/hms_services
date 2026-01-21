@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, Any, Dict, List
 from decimal import Decimal
 from sqlmodel import Field, SQLModel, func
-from sqlalchemy import Column, DateTime, DECIMAL, ForeignKey, Index, BigInteger, CheckConstraint, SmallInteger, Text
+from sqlalchemy import Column, DateTime, DECIMAL, ForeignKey, Index, BigInteger, CheckConstraint, SmallInteger, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 
 class Hotels(SQLModel, table=True):
@@ -90,6 +90,7 @@ class Rooms(SQLModel, table=True):
     __tablename__ = "rooms"
     __table_args__ = (
         Index("idx_room_hotel", "hotel_id"),
+        UniqueConstraint("hotel_id", "room_number", name="uq_hotel_room_number"),
     )
 
     room_id: Optional[int] = Field(default=None, primary_key=True)

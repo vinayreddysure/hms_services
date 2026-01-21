@@ -18,8 +18,16 @@ def check_in(
     start_time = booking.check_in_at or datetime.now(timezone.utc)
     
     # Overlap Check
+    # Overlap Check
     if not is_room_available(session, booking.room_id, start_time, booking.expected_check_out_at):
         raise HTTPException(status_code=409, detail="Room is already booked/occupied for these dates")
+
+    # Security: Verify Room Ownership
+    # Ensure the room actually belongs to THIS hotel
+    from shared.models import Rooms
+    room = session.get(Rooms, booking.room_id)
+    if not room or room.hotel_id != current_user.hotel_id:
+         raise HTTPException(status_code=403, detail="Invalid Room ID: This room does not belong to your hotel.")
 
     # Enforce Tenant
     new_booking = Bookings(

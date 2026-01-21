@@ -80,8 +80,14 @@ def create_booking(
     try:
         # --- 1. Smart ID Resolution for Rooms ---
         real_room = session.get(Rooms, booking.room_id)
+        
+        # Verify ownership if found by ID
+        if real_room and real_room.hotel_id != current_user.hotel_id:
+            real_room = None
+            
         if not real_room:
-            statement = select(Rooms).where(Rooms.room_number == str(booking.room_id))
+            # Try by Room Number scoped to Hotel
+            statement = select(Rooms).where(Rooms.room_number == str(booking.room_id), Rooms.hotel_id == current_user.hotel_id)
             real_room = session.exec(statement).first()
             if real_room:
                  booking.room_id = real_room.room_id
@@ -232,9 +238,11 @@ def get_customer_history(
         "global_feedbacks": feedbacks
     }
 
+from sqlmodel import Field
+
 class CheckoutRequest(SQLModel):
     notes: Optional[str] = None
-    rating: Optional[int] = None
+    rating: Optional[int] = Field(default=None, ge=1, le=5, description="Rating must be between 1 and 5")
 
 @router.get("/room/{room_id}/current")
 def get_current_booking_for_room(
@@ -248,8 +256,13 @@ def get_current_booking_for_room(
     """
     # Auto-resolve Room ID vs Room Number
     real_room = session.get(Rooms, room_id)
+    
+    # Verify ownership
+    if real_room and real_room.hotel_id != current_user.hotel_id:
+        real_room = None
+        
     if not real_room:
-        real_room = session.exec(select(Rooms).where(Rooms.room_number == str(room_id))).first()
+        real_room = session.exec(select(Rooms).where(Rooms.room_number == str(room_id), Rooms.hotel_id == current_user.hotel_id)).first()
     
     if not real_room:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -296,8 +309,13 @@ def checkout_room(
     """
     # Auto-resolve Room ID vs Room Number
     real_room = session.get(Rooms, room_id)
+    
+    # Verify ownership
+    if real_room and real_room.hotel_id != current_user.hotel_id:
+        real_room = None
+        
     if not real_room:
-        real_room = session.exec(select(Rooms).where(Rooms.room_number == str(room_id))).first()
+        real_room = session.exec(select(Rooms).where(Rooms.room_number == str(room_id), Rooms.hotel_id == current_user.hotel_id)).first()
     
     if not real_room:
          raise HTTPException(status_code=404, detail="Room not found")
@@ -336,6 +354,22 @@ def checkout_room(
             created_at=datetime.utcnow()
         )
         session.add(feedback)
+        
+        # 4.1 Update Customer Average Rating
+        # We must commit the feedback first or query carefully to include it.
+        # Ideally, we query ALL ratings for this customer and average them.
+        session.flush() # Ensure feedback is visible to valid queries in this transaction
+        
+        avg_query = select(func.avg(CustomerFeedbacks.rating)).where(CustomerFeedbacks.customer_id == booking.customer_id)
+        new_avg = session.exec(avg_query).one()
+        
+        if new_avg is not None:
+            customer = session.get(Customers, booking.customer_id)
+            if customer:
+                # Explicitly cast to Decimal to match model definition
+                from decimal import Decimal
+                customer.average_rating = Decimal(str(new_avg)) # Convert via string to avoid float precision errors
+                session.add(customer)
         
     session.commit()
     
