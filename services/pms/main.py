@@ -1,20 +1,23 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import records, hotel, check_in_out, rooms
 
 app = FastAPI(title="PMS Service")
 
-# --- CORS ---
-origins = [
-    "http://localhost:3000",
-    "http://localhost",
-    "https://hmsapp-production.up.railway.app"
-]
+# --- CORS (Configurable via Environment) ---
+cors_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
+if cors_origins_str == "*":
+    origins = ["*"]
+    allow_credentials = False
+else:
+    origins = [o.strip() for o in cors_origins_str.split(",")]
+    allow_credentials = True
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
