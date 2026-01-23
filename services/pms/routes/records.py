@@ -32,7 +32,15 @@ def lookup_customer(
         return None
         
     # 2. Key Stats
-    stay_count = session.exec(select(func.count(Bookings.booking_id)).where(Bookings.customer_id == customer.customer_id)).one()
+    # Global Stays (Network wide)
+    global_stay_count = session.exec(select(func.count(Bookings.booking_id)).where(Bookings.customer_id == customer.customer_id)).one()
+    
+    # Local Stays (This hotel only) - determines if "Returning" to THIS property
+    local_stay_count = session.exec(
+        select(func.count(Bookings.booking_id))
+        .where(Bookings.customer_id == customer.customer_id)
+        .where(Bookings.hotel_id == current_user.hotel_id)
+    ).one()
     
     last_stay = session.exec(
         select(Bookings)
@@ -63,10 +71,11 @@ def lookup_customer(
         "state": customer.state,
         "zip_code": customer.zip_code,
         "insights": {
-            "previousStays": stay_count,
+            "previousStays": global_stay_count,  # Network total
+            "localStays": local_stay_count,  # This hotel only
             "lastVisit": last_stay.check_in_at if last_stay else None,
             "globalRating": float(customer.average_rating) if customer.average_rating else 5.0,
-            "guestStatus": "returning" if stay_count > 0 else "new",
+            "guestStatus": "returning" if local_stay_count > 0 else "new",  # Based on LOCAL history
             "notes": recent_notes
         }
     }
