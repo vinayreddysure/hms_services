@@ -48,10 +48,11 @@ def lookup_customer(
         .order_by(Bookings.check_in_at.desc())
     ).first()
     
-    # 3. Fetch Notes (Feedback)
+    # 3. Fetch Notes (Feedback) - Scoped to THIS hotel only
     notes_query = (
         select(CustomerFeedbacks.notes)
         .where(CustomerFeedbacks.customer_id == customer.customer_id)
+        .where(CustomerFeedbacks.hotel_id == current_user.hotel_id)  # Only show notes from this hotel
         .where(CustomerFeedbacks.notes != None)
         .where(CustomerFeedbacks.notes != "")
         .order_by(CustomerFeedbacks.created_at.desc())
