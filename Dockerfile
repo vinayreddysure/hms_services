@@ -19,5 +19,5 @@ COPY . .
 ENV PYTHONPATH=/app
 
 # Start command - bind to 0.0.0.0 so Railway can route traffic
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD sh -c "uvicorn main:app --host 0.0.0.0 --port \${PORT:-8000}"
 
