@@ -134,6 +134,10 @@ class Bookings(SQLModel, table=True):
     
     total_amount: Decimal = Field(
         sa_column=Column(DECIMAL(precision=10, scale=2)))
+    cash_amount: Optional[Decimal] = Field(
+        default=0, sa_column=Column(DECIMAL(precision=10, scale=2), default=0))
+    card_amount: Optional[Decimal] = Field(
+        default=0, sa_column=Column(DECIMAL(precision=10, scale=2), default=0))
     status: str = Field(default="Active")
 
 # --- 7. CustomerFeedbacks ---

@@ -30,6 +30,7 @@ def get_available_rooms(
     )
     return rooms
 
+@router.get("", response_model=List[RoomRead])
 @router.get("/", response_model=List[RoomRead])
 def list_rooms(
     current_user: HotelUsers = Depends(get_current_user),
@@ -41,6 +42,7 @@ def list_rooms(
     stmt = select(Rooms).where(Rooms.hotel_id == current_user.hotel_id)
     return session.exec(stmt).all()
 
+@router.post("", response_model=RoomRead)
 @router.post("/", response_model=RoomRead)
 def create_room(
     room: RoomCreate,

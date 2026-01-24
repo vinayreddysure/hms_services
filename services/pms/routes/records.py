@@ -165,6 +165,8 @@ def create_booking(
             expected_check_out_at=booking.expected_check_out_at,
             actual_check_out_at=None,
             total_amount=booking.total_amount,
+            cash_amount=booking.cash_amount or 0,
+            card_amount=booking.card_amount or 0,
             status=booking.status or "Active"
         )
         session.add(new_booking)

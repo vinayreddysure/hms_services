@@ -27,6 +27,8 @@ class HotelCreate(HotelBase):
 class BookingCreate(BookingBase):
     customer_id: Optional[int] = None
     total_amount: float
+    cash_amount: Optional[float] = 0
+    card_amount: Optional[float] = 0
     notes: Optional[str] = None
     # Guest Upsert Fields
     guest_name: Optional[str] = None
