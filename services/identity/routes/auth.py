@@ -112,28 +112,10 @@ def register_hotel(
 
 # --- Password Reset Endpoints ---
 
-@router.post("/forgot-password")
-def forgot_password(
-    payload: ForgotPasswordRequest,
-    session: Session = Depends(get_session)
-):
-    user = session.exec(select(HotelUsers).where(HotelUsers.username == payload.email)).first()
-    if not user:
-        # Return 200 to avoid user enumeration
-        return {"message": "If email exists, reset link sent"}
-    
-    # Generate Token
-    token = secrets.token_urlsafe(32)
-    user.reset_token = token
-    # Use UTC to prevent naive vs aware comparison issues
-    user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-    session.add(user)
-    session.commit()
-    
-    # Generate Link
-    reset_link = f"http://localhost:3000/reset-password?token={token}"
-    
-    # Send Email (SMTP)
+def send_reset_email_task(email: str, reset_link: str):
+    """
+    Sends email in background to prevent blocking the main request thread.
+    """
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASSWORD")
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -145,7 +127,7 @@ def forgot_password(
             msg = MIMEText(f"Click to reset your password: {reset_link}")
             msg['Subject'] = "Password Reset Request"
             msg['From'] = smtp_user
-            msg['To'] = payload.email
+            msg['To'] = email
             
             if smtp_port == 465:
                 # Use SSL
@@ -164,9 +146,37 @@ def forgot_password(
             
     if not email_sent:
         # Fallback for Dev / No SMTP Configured
-        print(f"DEV MODE: Reset Token Generated for {payload.email}")
+        print(f"DEV MODE: Reset Token Generated for {email}")
         print(f"DEV MODE: Link: {reset_link}")
 
+@router.post("/forgot-password")
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session)
+):
+    user = session.exec(select(HotelUsers).where(HotelUsers.username == payload.email)).first()
+    if not user:
+        # Return 200 to avoid user enumeration
+        return {"message": "If email exists, reset link sent"}
+    
+    # Generate Token
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    # Use UTC to prevent naive vs aware comparison issues
+    user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    session.add(user)
+    session.commit()
+    
+    # Generate Link
+    # Note: In production, this should ideally use the frontend URL from env
+    # But for now localhost:3000 is hardcoded in the original logic. 
+    # User can update env later.
+    reset_link = f"http://localhost:3000/reset-password?token={token}"
+    
+    # Queue Email Task
+    background_tasks.add_task(send_reset_email_task, payload.email, reset_link)
+    
     return {"message": "If email exists, reset link sent"}
 
 @router.post("/reset-password")
