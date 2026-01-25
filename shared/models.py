@@ -84,6 +84,13 @@ class HotelUsers(SQLModel, table=True):
     password_hash: str
     full_name: str
     is_active: bool = Field(default=True)
+    
+    # Password Reset
+    reset_token: Optional[str] = Field(default=None, index=True)
+    reset_token_expires_at: Optional[datetime] = Field(
+        default=None, 
+        sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
 
 # --- 5. Rooms ---
 class Rooms(SQLModel, table=True):

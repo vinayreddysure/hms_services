@@ -1,13 +1,17 @@
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from sqlalchemy.exc import IntegrityError
 from shared.dependencies import get_session
 from shared.models import HotelUsers, Hotels, Rooms
-from shared.schemas import RegisterRequest
+from shared.schemas import RegisterRequest, ForgotPasswordRequest, ResetPasswordRequest
 from shared.core.security import verify_password, create_access_token, get_password_hash
 from shared.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+import os
 
 router = APIRouter()
 
@@ -84,7 +88,6 @@ def register_hotel(
     session.add(new_user)
     
     # 4. Create Rooms (Iterate Floors -> Rooms)
-    # 4. Create Rooms (Iterate Floors -> Rooms)
     try:
         for floor in payload.floors:
             for room_data in floor.rooms:
@@ -106,3 +109,86 @@ def register_hotel(
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
     
     return {"status": "success", "hotel_id": new_hotel.hotel_id}
+
+# --- Password Reset Endpoints ---
+
+@router.post("/forgot-password")
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    session: Session = Depends(get_session)
+):
+    user = session.exec(select(HotelUsers).where(HotelUsers.username == payload.email)).first()
+    if not user:
+        # Return 200 to avoid user enumeration
+        return {"message": "If email exists, reset link sent"}
+    
+    # Generate Token
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    # Use UTC to prevent naive vs aware comparison issues
+    user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    session.add(user)
+    session.commit()
+    
+    # Generate Link
+    reset_link = f"http://localhost:3000/reset-password?token={token}"
+    
+    # Send Email (SMTP)
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    
+    email_sent = False
+    if smtp_user and smtp_pass:
+        try:
+            msg = MIMEText(f"Click to reset your password: {reset_link}")
+            msg['Subject'] = "Password Reset Request"
+            msg['From'] = smtp_user
+            msg['To'] = payload.email
+            
+            if smtp_port == 465:
+                # Use SSL
+                with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+                    server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+            else:
+                # Use STARTTLS (Default i.e 587)
+                with smtplib.SMTP(smtp_host, smtp_port) as server:
+                    server.starttls()
+                    server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+            email_sent = True
+        except Exception as e:
+            print(f"SMTP Failed: {e}")
+            
+    if not email_sent:
+        # Fallback for Dev / No SMTP Configured
+        print(f"DEV MODE: Reset Token Generated for {payload.email}")
+        print(f"DEV MODE: Link: {reset_link}")
+
+    return {"message": "If email exists, reset link sent"}
+
+@router.post("/reset-password")
+def reset_password(
+    payload: ResetPasswordRequest,
+    session: Session = Depends(get_session)
+):
+    query = select(HotelUsers).where(HotelUsers.reset_token == payload.token)
+    user = session.exec(query).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid token")
+        
+    # Use UTC for comparison
+    if user.reset_token_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Token expired")
+        
+    # Update Password
+    user.password_hash = get_password_hash(payload.new_password)
+    user.reset_token = None
+    user.reset_token_expires_at = None
+    session.add(user)
+    session.commit()
+    
+    return {"message": "Password reset successfully"}

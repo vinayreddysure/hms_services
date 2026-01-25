@@ -133,3 +133,11 @@ class RegisterRequest(SQLModel):
     
     # Receipt Settings
     receiptSettings: Optional[ReceiptSettings] = None
+
+# --- Password Reset ---
+class ForgotPasswordRequest(SQLModel):
+    email: str
+
+class ResetPasswordRequest(SQLModel):
+    token: str
+    new_password: str
