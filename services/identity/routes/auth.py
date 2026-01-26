@@ -177,10 +177,8 @@ def forgot_password(
     session.commit()
     
     # Generate Link
-    # Note: In production, this should ideally use the frontend URL from env
-    # But for now localhost:3000 is hardcoded in the original logic. 
-    # User can update env later.
-    reset_link = f"http://localhost:3000/reset-password?token={token}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    reset_link = f"{frontend_url}/reset-password?token={token}"
     
     # Queue Email Task
     background_tasks.add_task(send_reset_email_task, payload.email, reset_link)
