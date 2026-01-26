@@ -116,6 +116,8 @@ def send_reset_email_task(email: str, reset_link: str):
     """
     Sends email in background to prevent blocking the main request thread.
     """
+    print(f"BACKGROUND TASK: Starting email send to {email}", flush=True)
+    
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASSWORD")
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -123,6 +125,7 @@ def send_reset_email_task(email: str, reset_link: str):
     
     email_sent = False
     if smtp_user and smtp_pass:
+        print(f"BACKGROUND TASK: SMTP Configured. User={smtp_user}, Host={smtp_host}:{smtp_port}", flush=True)
         try:
             msg = MIMEText(f"Click to reset your password: {reset_link}")
             msg['Subject'] = "Password Reset Request"
@@ -131,23 +134,28 @@ def send_reset_email_task(email: str, reset_link: str):
             
             if smtp_port == 465:
                 # Use SSL
+                print("BACKGROUND TASK: Connecting via SSL...", flush=True)
                 with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
                     server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
             else:
                 # Use STARTTLS (Default i.e 587)
+                print("BACKGROUND TASK: Connecting via STARTTLS...", flush=True)
                 with smtplib.SMTP(smtp_host, smtp_port) as server:
                     server.starttls()
                     server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
+            
+            print("BACKGROUND TASK: Email Sent Successfully!", flush=True)
             email_sent = True
         except Exception as e:
-            print(f"SMTP Failed: {e}")
+            print(f"SMTP Failed: {e}", flush=True)
             
     if not email_sent:
         # Fallback for Dev / No SMTP Configured
-        print(f"DEV MODE: Reset Token Generated for {email}")
-        print(f"DEV MODE: Link: {reset_link}")
+        print("BACKGROUND TASK: Sending Failed or No Config. Falling back to Log Mode.", flush=True)
+        print(f"DEV MODE: Reset Token Generated for {email}", flush=True)
+        print(f"DEV MODE: Link: {reset_link}", flush=True)
 
 @router.post("/forgot-password")
 def forgot_password(
